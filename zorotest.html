@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة المهام للطلاب</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <style>
+        :root {
+            --primary-color: #ff0000;
+            --secondary-color: #000000;
+            --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #e4e4e4 100%);
+            --card-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: rgba(255, 255, 255, 0.95);
+            padding: 35px;
+            border-radius: 20px;
+            box-shadow: var(--card-shadow);
+            backdrop-filter: blur(10px);
+        }
+        
+        input, textarea {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: 2px solid #eee;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            font-size: 16px;
+            background: rgba(255, 255, 255, 0.9);
+        }
+        
+        input:focus, textarea:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(255, 0, 0, 0.1);
+            outline: none;
+        }
+        
+        button {
+            background: linear-gradient(45deg, var(--secondary-color), var(--primary-color));
+            color: white;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+            font-size: 16px;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+        
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(255, 0, 0, 0.2);
+        }
+        
+        .task {
+            border: none;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s ease;
+        }
+        
+        .task:hover {
+            transform: translateY(-5px);
+        }
+        
+        .comment {
+            background-color: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 12px;
+            border-right: 4px solid var(--primary-color);
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        h2 {
+            color: var(--secondary-color);
+            margin-bottom: 25px;
+            border-bottom: 3px solid var(--primary-color);
+            padding-bottom: 15px;
+            font-size: 28px;
+        }
+        
+        h3 {
+            color: var(--secondary-color);
+            font-size: 22px;
+            margin-top: 0;
+        }
+        
+        .task-meta {
+            color: #666;
+            font-size: 0.95em;
+            margin: 10px 0;
+            padding: 8px 12px;
+            background: rgba(0,0,0,0.05);
+            border-radius: 8px;
+            display: inline-block;
+        }
+        
+        .logout-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 0, 0, 0.9);
+        }
+        
+        .user-info {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        
+        .comment-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="loginForm" class="login-form">
+            <h2>تسجيل الدخول</h2>
+            <input type="text" id="username" placeholder="اسم المستخدم">
+            <input type="password" id="password" placeholder="كلمة المرور">
+            <button onclick="login()">دخول</button>
+        </div>
+
+        <div id="adminPanel" class="admin-panel" style="display: none;">
+            <div class="user-info">مرحباً بك في لوحة المشرف</div>
+            <button class="logout-btn" onclick="logout()">تسجيل خروج</button>
+            <h2>لوحة المشرف</h2>
+            <div>
+                <h3>إضافة مهمة جديدة</h3>
+                <input type="text" id="taskTitle" placeholder="عنوان المهمة">
+                <textarea id="taskDescription" placeholder="وصف المهمة" rows="4"></textarea>
+                <input type="datetime-local" id="taskDueDate">
+                <button onclick="addTask()">إضافة المهمة</button>
+            </div>
+            <div id="adminTasks"></div>
+        </div>
+
+        <div id="userPanel" class="user-panel" style="display: none;">
+            <div class="user-info">مرحباً بك</div>
+            <button class="logout-btn" onclick="logout()">تسجيل خروج</button>
+            <h2>المهام المتاحة</h2>
+            <div id="userTasks"></div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBKTEU-ogrxmgTmTcN1vjlMPSPnF0FRQJ0",
+            authDomain: "easy-study-c0301.firebaseapp.com",
+            databaseURL: "https://easy-study-c0301.firebaseio.com",
+            projectId: "easy-study-c0301",
+            storageBucket: "easy-study-c0301.appspot.com",
+            messagingSenderId: "862604383167",
+            appId: "1:862604383167:web:c9cde3fa7d523d600fc70a",
+            measurementId: "G-QVN6QKY1WQ"
+        };
+        
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        const users = {
+            'admin': 'ghanighanizoro',
+            'user1': 'student123'
+        };
+
+        let currentUser = '';
+
+        function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (users[username] === password) {
+                currentUser = username;
+                document.getElementById('loginForm').style.display = 'none';
+                
+                if (username === 'admin') {
+                    document.getElementById('adminPanel').style.display = 'block';
+                } else {
+                    document.getElementById('userPanel').style.display = 'block';
+                }
+                
+                // Listen for tasks updates
+                listenForTasks();
+            } else {
+                alert('خطأ في اسم المستخدم أو كلمة المرور');
+            }
+        }
+
+        function logout() {
+            currentUser = '';
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('adminPanel').style.display = 'none';
+            document.getElementById('userPanel').style.display = 'none';
+            
+            // Remove database listener
+            database.ref('tasks').off();
+        }
+
+        function addTask() {
+            const title = document.getElementById('taskTitle').value;
+            const description = document.getElementById('taskDescription').value;
+            const dueDate = document.getElementById('taskDueDate').value;
+
+            if (!title || !description || !dueDate) {
+                alert('الرجاء ملء جميع الحقول');
+                return;
+            }
+
+            const task = {
+                id: Date.now(),
+                title,
+                description,
+                dueDate,
+                comments: [],
+                createdAt: new Date().toISOString(),
+                createdBy: currentUser
+            };
+
+            // Add task to Firebase
+            database.ref('tasks/' + task.id).set(task);
+            
+            document.getElementById('taskTitle').value = '';
+            document.getElementById('taskDescription').value = '';
+            document.getElementById('taskDueDate').value = '';
+        }
+
+        function addComment(taskId) {
+            const commentInput = document.getElementById(`comment-${taskId}`);
+            const commentText = commentInput.value.trim();
+            
+            if (!commentText) {
+                alert('الرجاء كتابة تعليق');
+                return;
+            }
+
+            const comment = {
+                text: commentText,
+                user: currentUser,
+                date: new Date().toLocaleString('ar')
+            };
+
+            // Add comment to Firebase
+            database.ref(`tasks/${taskId}/comments`).push(comment);
+            commentInput.value = '';
+        }
+
+        function listenForTasks() {
+            database.ref('tasks').on('value', (snapshot) => {
+                const tasks = [];
+                snapshot.forEach((childSnapshot) => {
+                    tasks.push(childSnapshot.val());
+                });
+                
+                renderTasks(tasks);
+            });
+        }
+
+        function renderTasks(tasks) {
+            const tasksHTML = tasks.map(task => `
+                <div class="task">
+                    <h3>${task.title}</h3>
+                    <p>${task.description}</p>
+                    <p class="task-meta">
+                        <span>موعد التسليم: ${new Date(task.dueDate).toLocaleString('ar')}</span>
+                        <br>
+                        <small>تم الإنشاء بواسطة: ${task.createdBy}</small>
+                    </p>
+                    <div class="comment-section">
+                        <h4>التعليقات:</h4>
+                        ${Object.values(task.comments || {}).map(comment => `
+                            <div class="comment">
+                                <p>${comment.text}</p>
+                                <small>${comment.user} - ${comment.date}</small>
+                            </div>
+                        `).join('')}
+                        <input type="text" id="comment-${task.id}" placeholder="أضف تعليقاً">
+                        <button onclick="addComment(${task.id})">إضافة تعليق</button>
+                    </div>
+                </div>
+            `).join('');
+
+            if (currentUser === 'admin') {
+                document.getElementById('adminTasks').innerHTML = tasksHTML;
+            } else {
+                document.getElementById('userTasks').innerHTML = tasksHTML;
+            }
+        }
+    </script>
+</body>
+</html>
